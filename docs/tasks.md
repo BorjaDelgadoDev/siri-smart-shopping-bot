@@ -8,15 +8,15 @@ Fase 1: Setup y Cerebro (IA)
 
 [x] [IA] Crear ai_handler.py con el System Prompt para forzar salida JSON.
 
-[ ] [Test] Validar que la IA limpia frases complejas y devuelve una lista de objetos.
+[x] [Test] Validar que la IA limpia frases complejas y devuelve una lista de objetos.
 
 Fase 2: Endpoint de Siri y Pruebas Locales
 
 [x] [API] Crear ruta POST /siri en main.py con validación de token.
 
-[ ] [Test] Usar Postman para enviar textos al endpoint y verificar que se guardan en la DB.
+[x] [Test] Usar Postman para enviar textos al endpoint y verificar que se guardan en la DB.
 
-[ ] [iOS] Configurar el Atajo de Siri para enviar voz a la URL local (vía Ngrok).
+[x] [iOS] Configurar el Atajo de Siri para enviar voz a la URL local (vía Ngrok).
 
 Fase 3: Telegram y Mensaje Maestro
 
