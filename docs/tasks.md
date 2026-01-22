@@ -2,11 +2,11 @@ Tasks: Roadmap de Implementación
 
 Fase 1: Setup y Cerebro (IA)
 
-[ ] [Setup] Crear entorno virtual y archivo .env.
+[x] [Setup] Crear entorno virtual y archivo .env.
 
-[ ] [DB] Crear database.py con funciones init_db, add_item y get_all_items.
+[x] [DB] Crear database.py con funciones init_db, add_item y get_all_items.
 
-[ ] [IA] Crear ai_handler.py con el System Prompt para forzar salida JSON.
+[x] [IA] Crear ai_handler.py con el System Prompt para forzar salida JSON.
 
 [ ] [Test] Validar que la IA limpia frases complejas y devuelve una lista de objetos.
 
