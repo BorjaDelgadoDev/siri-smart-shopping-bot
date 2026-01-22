@@ -20,11 +20,11 @@ Fase 2: Endpoint de Siri y Pruebas Locales
 
 Fase 3: Telegram y Mensaje Maestro
 
-[ ] [Bot] Implementar render_list() en bot_logic.py para formatear el mensaje con emojis.
+[x] [Bot] Implementar render_list() en bot_logic.py para formatear el mensaje con emojis.
 
-[ ] [Bot] Lógica de persistencia de mensaje: Guardar y leer master_message_id.
+[x] [Bot] Lógica de persistencia de mensaje: Guardar y leer master_message_id.
 
-[ ] [Bot] Implementar el botón "Comprar" que elimina el item y refresca el mensaje.
+[x] [Bot] Implementar el botón "Comprar" que elimina el item y refresca el mensaje.
 
 Fase 4: Despliegue Final
 
