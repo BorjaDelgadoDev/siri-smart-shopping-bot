@@ -85,11 +85,16 @@ async def update_master_message(bot: Bot):
         # Intentar fijar el nuevo mensaje para futura recuperación
         try:
             await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id)
+            print(f"Message {msg.message_id} pinned successfully.")
+            
             # Intentar borrar el anterior si existía uno diferente
             if master_message_id and int(master_message_id) != msg.message_id:
-                await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-        except:
-            pass
+                try:
+                    await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
+                except:
+                    pass
+        except Exception as pin_error:
+            print(f"FAILED TO PIN: {pin_error}. Make sure the bot is ADMIN with 'Pin Messages' permission.")
             
     except Exception as e:
         print(f"Critical error sending message: {e}")
