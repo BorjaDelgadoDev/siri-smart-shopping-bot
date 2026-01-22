@@ -1,0 +1,33 @@
+Tasks: Roadmap de Implementación
+
+Fase 1: Setup y Cerebro (IA)
+
+[ ] [Setup] Crear entorno virtual y archivo .env.
+
+[ ] [DB] Crear database.py con funciones init_db, add_item y get_all_items.
+
+[ ] [IA] Crear ai_handler.py con el System Prompt para forzar salida JSON.
+
+[ ] [Test] Validar que la IA limpia frases complejas y devuelve una lista de objetos.
+
+Fase 2: Endpoint de Siri y Pruebas Locales
+
+[ ] [API] Crear ruta POST /siri en main.py con validación de token.
+
+[ ] [Test] Usar Postman para enviar textos al endpoint y verificar que se guardan en la DB.
+
+[ ] [iOS] Configurar el Atajo de Siri para enviar voz a la URL local (vía Ngrok).
+
+Fase 3: Telegram y Mensaje Maestro
+
+[ ] [Bot] Implementar render_list() en bot_logic.py para formatear el mensaje con emojis.
+
+[ ] [Bot] Lógica de persistencia de mensaje: Guardar y leer master_message_id.
+
+[ ] [Bot] Implementar el botón "Comprar" que elimina el item y refresca el mensaje.
+
+Fase 4: Despliegue Final
+
+[ ] [Deploy] Subir a GitHub (asegurando .gitignore para la DB y .env).
+
+[ ] [Deploy] Configurar Webhook oficial de Telegram en Render.
