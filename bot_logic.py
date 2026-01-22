@@ -55,6 +55,10 @@ async def update_master_message(bot: Bot):
                 parse_mode="Markdown"
             )
         except Exception as e:
+            # Si el contenido es el mismo, Telegram da error. Lo ignoramos.
+            if "Message is not modified" in str(e):
+                return
+            
             print(f"Failed to edit message: {e}. Sending a new one.")
             msg = await bot.send_message(
                 chat_id=chat_id,
@@ -63,6 +67,11 @@ async def update_master_message(bot: Bot):
                 parse_mode="Markdown"
             )
             database.set_state("master_message_id", msg.message_id)
+            # Opcional: Intentar borrar el mensaje viejo si falló el edit pero sigue existiendo
+            try:
+                await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
+            except:
+                pass
     else:
         msg = await bot.send_message(
             chat_id=chat_id,
