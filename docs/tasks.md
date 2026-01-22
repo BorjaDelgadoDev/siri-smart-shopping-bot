@@ -12,7 +12,7 @@ Fase 1: Setup y Cerebro (IA)
 
 Fase 2: Endpoint de Siri y Pruebas Locales
 
-[ ] [API] Crear ruta POST /siri en main.py con validación de token.
+[x] [API] Crear ruta POST /siri en main.py con validación de token.
 
 [ ] [Test] Usar Postman para enviar textos al endpoint y verificar que se guardan en la DB.
 
