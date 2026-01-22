@@ -38,12 +38,24 @@ async def update_master_message(bot: Bot):
     """Update the existing master message or send a new one."""
     text, reply_markup = render_list()
     
-    chat_id = os.getenv("CHAT_ID") # El ID del chat de la pareja
+    chat_id = os.getenv("CHAT_ID")
     if not chat_id:
         print("Error: CHAT_ID not set in .env")
         return
 
+    # 1. Intentar obtener ID de la base de datos
     master_message_id = database.get_state("master_message_id")
+
+    # 2. Si no hay ID (Render reinició), intentar buscar el mensaje fijado del bot
+    if not master_message_id:
+        try:
+            chat = await bot.get_chat(chat_id)
+            if chat.pinned_message and chat.pinned_message.from_user.id == bot.id:
+                master_message_id = chat.pinned_message.message_id
+                database.set_state("master_message_id", master_message_id)
+                print(f"Recovered master_message_id from pinned message: {master_message_id}")
+        except Exception as e:
+            print(f"Could not recover pinned message: {e}")
 
     if master_message_id:
         try:
@@ -54,25 +66,14 @@ async def update_master_message(bot: Bot):
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
             )
+            return # Éxito
         except Exception as e:
-            # Si el contenido es el mismo, Telegram da error. Lo ignoramos.
             if "Message is not modified" in str(e):
                 return
-            
-            print(f"Failed to edit message: {e}. Sending a new one.")
-            msg = await bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
-            database.set_state("master_message_id", msg.message_id)
-            # Opcional: Intentar borrar el mensaje viejo si falló el edit pero sigue existiendo
-            try:
-                await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-            except:
-                pass
-    else:
+            print(f"Failed to edit message {master_message_id}: {e}")
+
+    # 3. Si no hay ID o el edit falló, enviar uno nuevo y fijarlo
+    try:
         msg = await bot.send_message(
             chat_id=chat_id,
             text=text,
@@ -80,3 +81,15 @@ async def update_master_message(bot: Bot):
             parse_mode="Markdown"
         )
         database.set_state("master_message_id", msg.message_id)
+        
+        # Intentar fijar el nuevo mensaje para futura recuperación
+        try:
+            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id)
+            # Intentar borrar el anterior si existía uno diferente
+            if master_message_id and int(master_message_id) != msg.message_id:
+                await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
+        except:
+            pass
+            
+    except Exception as e:
+        print(f"Critical error sending message: {e}")
