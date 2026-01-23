@@ -80,6 +80,23 @@ async def telegram_webhook(request: Request):
             
     return {"ok": True}
 
+@app.get("/debug/status")
+async def debug_status(x_auth_token: str = Header(None)):
+    """Remote monitoring endpoint."""
+    expected_token = os.getenv("SIRI_AUTH_TOKEN")
+    if not expected_token or x_auth_token != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    items = database.get_all_items()
+    master_id = database.get_state("master_message_id")
+    
+    return {
+        "status": "active",
+        "master_message_id": master_id,
+        "items_count": len(items),
+        "items": items
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
