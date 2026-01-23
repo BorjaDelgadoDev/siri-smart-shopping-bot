@@ -66,13 +66,19 @@ async def update_master_message(bot: Bot):
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
             )
-            return # Éxito
+            return # Éxito total
         except Exception as e:
-            if "Message is not modified" in str(e):
+            err_str = str(e).lower()
+            if "message is not modified" in err_str:
                 return
-            print(f"Failed to edit message {master_message_id}: {e}")
+            # Solo si el mensaje fue borrado intentamos mandar uno nuevo
+            if "message to edit not found" in err_str or "message can't be edited" in err_str:
+                print(f"Message {master_message_id} lost. Sending new one.")
+            else:
+                print(f"Error editing message {master_message_id}: {e}")
+                return # Si es otro error (ej: red), no duplicamos
 
-    # 3. Si no hay ID o el edit falló, enviar uno nuevo y fijarlo
+    # 3. Solo llegamos aquí si NO había mensaje o si el anterior fue borrado
     try:
         msg = await bot.send_message(
             chat_id=chat_id,
@@ -82,19 +88,15 @@ async def update_master_message(bot: Bot):
         )
         database.set_state("master_message_id", msg.message_id)
         
-        # Intentar fijar el nuevo mensaje para futura recuperación
+        # Fijar el nuevo mensaje
         try:
-            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id)
-            print(f"Message {msg.message_id} pinned successfully.")
-            
-            # Intentar borrar el anterior si existía uno diferente
+            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
+            # Intentar borrar el anterior (limpieza extrema)
             if master_message_id and int(master_message_id) != msg.message_id:
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-                except:
-                    pass
-        except Exception as pin_error:
-            print(f"FAILED TO PIN: {pin_error}. Make sure the bot is ADMIN with 'Pin Messages' permission.")
+                except: pass
+        except: pass
             
     except Exception as e:
         print(f"Critical error sending message: {e}")
