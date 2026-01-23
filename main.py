@@ -65,7 +65,6 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
 async def telegram_webhook(request: Request):
     """Endpoint for Telegram Webhooks."""
     data = await request.json()
-    print(f"WEBHOOK RECEIVED: {json.dumps(data)}")
     update = Update.de_json(data, bot)
     chat_id_env = os.getenv("CHAT_ID")
     
