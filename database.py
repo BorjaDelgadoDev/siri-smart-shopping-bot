@@ -35,10 +35,24 @@ def init_db():
 def add_item(name, quantity, category):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
-        (name, quantity, category)
-    )
+    
+    # Buscar si ya existe el producto (ignorando mayúsculas/minúsculas)
+    cursor.execute("SELECT id FROM items WHERE LOWER(name) = LOWER(?)", (name,))
+    item = cursor.fetchone()
+    
+    if item:
+        # Si existe, actualizamos la cantidad y categoría
+        cursor.execute(
+            "UPDATE items SET quantity = ?, category = ? WHERE id = ?",
+            (quantity, category, item[0])
+        )
+    else:
+        # Si no existe, insertamos uno nuevo
+        cursor.execute(
+            "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
+            (name, quantity, category)
+        )
+    
     conn.commit()
     conn.close()
 
