@@ -66,8 +66,9 @@ async def telegram_webhook(request: Request):
     """Endpoint for Telegram Webhooks."""
     data = await request.json()
     update = Update.de_json(data, bot)
+    chat_id_env = os.getenv("CHAT_ID")
     
-    # Procesar CallbackQueries (Botón Comprar)
+    # 1. Procesar CallbackQueries (Botón Comprar)
     if update.callback_query:
         query = update.callback_query
         data_recv = query.data
@@ -77,7 +78,18 @@ async def telegram_webhook(request: Request):
             database.delete_item(item_id)
             await query.answer("¡Comprado!")
             await bot_logic.update_master_message(bot)
-            
+        return {"ok": True}
+
+    # 2. Lógica de "Limpieza" (Janitor): Borrar mensajes de usuarios en el grupo de la compra
+    if update.message and str(update.message.chat_id) == chat_id_env:
+        try:
+            # Borrar cualquier mensaje (texto, audio, etc) que no sea del bot
+            if not update.message.from_user.is_bot:
+                await bot.delete_message(chat_id=update.message.chat_id, message_id=update.message.message_id)
+                print(f"Janitor: Deleted message from user {update.message.from_user.id}")
+        except Exception as e:
+            print(f"Janitor Error: {e}")
+
     return {"ok": True}
 
 @app.get("/debug/status")
