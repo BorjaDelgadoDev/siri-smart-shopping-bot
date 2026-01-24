@@ -25,64 +25,58 @@ Olvida los chats llenos de mensajes sueltos. Con este bot, la gestión de tu hog
 
 ---
 
-## 🛠️ Flujo de Trabajo
+## 🛠️ Guía Maestra de Configuración (Paso a Paso)
 
-```mermaid
-graph LR
-    A[iPhone / Siri] -- "Dictado de Voz" --> B[FastAPI Server]
-    B -- "Texto Crudo" --> C(Google Gemini AI)
-    C -- "JSON Categorizado" --> B
-    B -- "Editar / Enviar" --> D{Telegram Group}
-    D -- "Mensaje Maestro" --> E[Lista Visual con Botones]
-    E -- "Click ✅" --> B
-    B -- "Update DB" --> E
-```
+Sigue estos pasos en orden para tener tu bot funcionando al 100%:
+
+### 1️⃣ Preparación de Telegram
+1. Habla con [@BotFather](https://t.me/botfather) y crea un nuevo bot con `/newbot`. Guarda el **Token**.
+2. **Importante**: Manda `/mybots`, elige tu bot, ve a `Bot Settings` > `Group Privacy` y pulsa **Turn Off** (*Privacy mode is disabled*). Esto permite al bot limpiar el chat.
+3. Crea un grupo en Telegram con tu pareja/familia y añade al bot.
+4. Nombra al bot **Administrador** del grupo y asegúrate de que tenga permiso para **Eliminar mensajes** y **Fijar mensajes**.
+5. Obtén el `CHAT_ID` del grupo (puedes usar @userinfobot o similares). Los IDs de grupo suelen empezar con `-100`.
+
+### 2️⃣ Clave de Inteligencia Artificial
+1. Ve a [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. Crea una **API Key** gratuita para Gemini. Esta es la que categorizará tus productos.
+
+### 3️⃣ Despliegue del Servidor (Render)
+1. Haz un Fork de este repositorio en tu cuenta de GitHub.
+2. Crea una cuenta en [Render.com](https://render.com) y pulsa en **New > Web Service**.
+3. Conecta tu repositorio de GitHub.
+4. En **Environment Variables**, añade:
+   - `TELEGRAM_TOKEN`: El token de BotFather.
+   - `GEMINI_API_KEY`: Tu clave de Google.
+   - `CHAT_ID`: El ID del grupo de Telegram.
+   - `SIRI_AUTH_TOKEN`: Una contraseña inventada por ti (ej: `MiCasaSegura123`).
+   - `AUTHORIZED_USERS`: Tu ID de Telegram (para que nadie más pueda usar tu bot).
+5. Pulsa **Deploy**. Una vez esté "Live", copia la URL (ej: `https://mi-bot.onrender.com`).
+
+### 4️⃣ Activación de Botones (Webhook)
+Para que Telegram sepa dónde enviar los clics de los botones:
+1. Abre una terminal en tu ordenador.
+2. Ejecuta: `python3 set_webhook.py https://tu-url-de-render.com`
+3. Si recibes `{"ok":true}`, los botones ya funcionan.
+
+### 5️⃣ Configuración de Siri (Atajo de iOS)
+1. Abre la app **Atajos** en tu iPhone y crea uno nuevo llamado *"Añade a la compra"*.
+2. Añade la acción **"Dictar texto"**.
+3. Añade la acción **"Obtener contenido de URL"**:
+   - **URL**: `https://tu-url-de-render.com/siri`
+   - **Método**: `POST`
+   - **Encabezados**: Añade `X-Auth-Token` con tu `SIRI_AUTH_TOKEN`.
+   - **Cuerpo JSON**: Añade la clave `text` con el valor `Texto dictado`.
+4. ¡Pruébalo! Di: *"Oye Siri, añade a la compra manzanas y leche"*.
 
 ---
 
 ## ✨ Características Premium
 
-- 🟢 **Master Message Concept**: Olvida el scroll infinito. Solo existe UN mensaje que se edita mágicamente.
-- 📂 **Categorización Dinámica**: Frutas, Lácteos, Limpieza... todo en su sitio gracias a la IA.
+- 🟢 **Master Message Concept**: Solo existe UN mensaje que se edita mágicamente.
+- 📂 **Categorización Dinámica**: Frutos, Lácteos, Limpieza... todo en su sitio gracias a la IA.
 - 🧹 **Modo Janitor (Conserje)**: El bot borra cualquier mensaje ajeno para mantener el chat impoluto.
-- 📌 **Auto-Pin & Recovery**: Si el servidor se apaga, el bot recupera la lista buscando el mensaje fijado.
-- 🔒 **Security First**: Autenticación por Bearer Token y filtrado de usuarios autorizados.
-
----
-
-## 🚀 Despliegue en 5 Minutos
-
-### 1. Preparación Local
-```bash
-git clone https://github.com/BorjaDelgadoDev/chatboot-telegram.git
-cd chatboot-telegram
-pip install -r requirements.txt
-cp .env.example .env
-```
-
-### 2. Configuración (Variables de Entorno)
-| Variable | Descripción |
-| :--- | :--- |
-| `TELEGRAM_TOKEN` | Token de @BotFather |
-| `GEMINI_API_KEY` | API Key de Google AI Studio |
-| `CHAT_ID` | ID del grupo de Telegram |
-| `SIRI_AUTH_TOKEN` | Contraseña para el Atajo de iOS |
-
-### 3. ¡A Volar!
-Lanza el servidor localmente:
-```bash
-uvicorn main:app --reload
-```
-O simplemente conéctalo a **Render** o **Railway** usando el `Procfile` incluido.
-
----
-
-## 📱 Atajo de Siri (iOS)
-Para una integración total, configura un Atajo en tu iPhone:
-- **Acción**: Dictar texto.
-- **Acción**: Obtener contenido de URL (POST).
-- **Header**: `X-Auth-Token` : `TuTokenElegido`.
-- **JSON Body**: `{"text": "Variable del dictado"}`.
+- 📌 **Auto-Pin & Recovery**: El bot recupera la lista buscando el mensaje fijado automáticamente.
+- 🔒 **Security First**: Autenticación por token y filtrado de usuarios.
 
 ---
 
