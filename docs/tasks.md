@@ -1,4 +1,4 @@
-Tasks: Roadmap de Implementación
+Tasks: Roadmap de Siri Smart Shopping Bot
 
 Fase 1: Setup y Cerebro (IA)
 
