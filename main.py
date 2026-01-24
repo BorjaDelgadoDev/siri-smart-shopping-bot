@@ -22,6 +22,11 @@ class SiriRequest(BaseModel):
 async def startup_event():
     database.init_db()
     
+    if bot:
+        # Requerido en python-telegram-bot v20+
+        await bot.initialize()
+        print("Bot initialized properly.")
+
     # Automatización del Webhook si existe BASE_URL
     base_url = os.getenv("BASE_URL")
     if base_url and bot:
