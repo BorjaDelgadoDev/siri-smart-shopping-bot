@@ -44,7 +44,8 @@ async def ensure_db_synced(bot: Bot):
         # 1. Asegurar inicialización
         try:
             await bot.initialize()
-        except Exception: pass
+        except Exception:
+            pass
 
         # 2. Consultar Telegram
         chat = await bot.get_chat(chat_id)
@@ -60,10 +61,9 @@ async def ensure_db_synced(bot: Bot):
         # 4. Actualizar ID del mensaje maestro localmente
         database.set_state("master_message_id", str(pinned.message_id))
 
-        # 5. ¡SANACIÓN!: Si la DB está vacía, recuperamos de los botones y el texto
-        current_items = database.get_all_items()
-        if not current_items and pinned.reply_markup and pinned.text:
-            print(f"Self-Healing: DB empty. Recovering items from pin {pinned.message_id}...")
+        # 5. ¡SANACIÓN!: Recuperamos siempre que el pin tenga botones (nuestro backup)
+        if pinned.reply_markup and pinned.text:
+            print(f"Self-Healing: Checking recovery from pin {pinned.message_id}...")
             
             # Mapear botones a nombres
             item_button_names = []
