@@ -95,8 +95,10 @@ async def update_master_message(bot: Bot):
             if master_message_id and int(master_message_id) != msg.message_id:
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-                except: pass
-        except: pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
             
     except Exception as e:
         print(f"Critical error sending message: {e}")
