@@ -56,15 +56,27 @@ def configure_ai():
 def process_text(text):
     model = configure_ai()
     if not model:
-        # Fallback si no hay API Key (para pruebas de estructura)
-        print("Warning: GEMINI_API_KEY not found. Returning empty list.")
-        return []
+        raise ValueError("GEMINI_API_KEY is missing or empty in environment.")
     
     # try/except removido para que main.py capture el error exacto en flight_recorder
     response = model.generate_content(text)
+    
+    if not response.parts:
+        raise ValueError(f"AI returned blocked/empty response. FinishReason: {response.prompt_feedback}")
+
+    raw_content = response.text
     # Limpieza simple por si la IA añade markdown ```json
-    clean_response = response.text.strip().replace("```json", "").replace("```", "")
-    return json.loads(clean_response)
+    clean_response = raw_content.strip().replace("```json", "").replace("```", "")
+    
+    try:
+        data = json.loads(clean_response)
+    except json.JSONDecodeError:
+        raise ValueError(f"AI returned invalid JSON: {raw_content}")
+
+    if not data:
+        raise ValueError(f"AI returned empty list. Raw: {raw_content}")
+        
+    return data
 
 if __name__ == "__main__":
     # Test simple (no funcionará sin API key real en el entorno)
