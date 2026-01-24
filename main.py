@@ -18,6 +18,14 @@ app = FastAPI(title="Smart Shopping List Bot API")
 class SiriRequest(BaseModel):
     text: str
 
+# Almacén de diagnóstico en memoria (se borra si Render reinicia)
+DIAGNOSTIC_DATA = {
+    "last_siri_text": None,
+    "last_ai_response": None,
+    "last_error": None,
+    "last_request_time": None
+}
+
 @app.on_event("startup")
 async def startup_event():
     database.init_db()
@@ -57,7 +65,17 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     raw_text = request.text
     print(f"DIAGNOSTIC: Siri text received: '{raw_text}'")
     
-    products = ai_handler.process_text(raw_text)
+    # Guardar en diagnóstico
+    DIAGNOSTIC_DATA["last_siri_text"] = raw_text
+    DIAGNOSTIC_DATA["last_request_time"] = os.popen("date").read().strip()
+
+    try:
+        products = ai_handler.process_text(raw_text)
+        DIAGNOSTIC_DATA["last_ai_response"] = products
+    except Exception as e:
+        DIAGNOSTIC_DATA["last_error"] = str(e)
+        products = []
+    
     print(f"DIAGNOSTIC: AI returned: {products}")
     
     if not products:
@@ -128,6 +146,7 @@ async def chat_audit(x_auth_token: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     report = await bot_logic.audit_and_fix(bot)
+    report["flight_recorder"] = DIAGNOSTIC_DATA
     return report
 
 @app.get("/debug/status")
