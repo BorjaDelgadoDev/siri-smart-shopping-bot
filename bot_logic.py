@@ -65,21 +65,27 @@ async def ensure_db_synced(bot: Bot):
         if pinned.reply_markup and pinned.text:
             print(f"Self-Healing: Checking recovery from pin {pinned.message_id}...")
             
-            # Mapear botones a nombres
-            item_button_names = []
+            # Mapear botones a nombres e IDs
+            item_button_map = {}  # {nombre: id_del_boton}
             for row in pinned.reply_markup.inline_keyboard:
                 for button in row:
                     if button.callback_data.startswith("buy_"):
-                        item_button_names.append(button.text.replace("✅ ", "").strip())
+                        button_name = button.text.replace("✅ ", "").strip()
+                        button_id = button.callback_data.replace("buy_", "")
+                        item_button_map[button_name] = button_id
 
             # Analizar el texto para encontrar categorías
             lines = pinned.text.split("\n")
             current_category = "📦 Otros"
             recovered_count = 0
 
-            # Lista de nuestras categorías conocidas (para comparar emojis/nombres)
-            # No necesitamos la lista exacta, cualquier línea que no empiece por punto ni esté vacía 
-            # después del título es una categoría.
+            # Limpiar la DB antes de recuperar para evitar duplicados
+            current_items = database.get_all_items()
+            if current_items:
+                print(f"Self-Healing: DB has {len(current_items)} items. Clearing for clean recovery...")
+                for item_id, _, _, _ in current_items:
+                    database.delete_item(item_id)
+
             for line in lines:
                 line = line.strip()
                 if not line or line.startswith("📝") or "Lista de la Compra" in line:
@@ -88,10 +94,9 @@ async def ensure_db_synced(bot: Bot):
                 if line.startswith("•"):
                     # Es un producto. Formato: • Nombre (Cantidad) o • Nombre
                     name_part = line.replace("•", "").strip()
-                    # Si el nombre está en nuestros botones, lo recuperamos
-                    # Quitamos la cantidad del nombre para buscar en botones
                     base_name = name_part.split("(")[0].strip()
-                    if base_name in item_button_names:
+                    
+                    if base_name in item_button_map:
                         quantity = "1"
                         if "(" in name_part and ")" in name_part:
                             quantity = name_part.split("(")[1].split(")")[0]
@@ -102,7 +107,10 @@ async def ensure_db_synced(bot: Bot):
                     # Es una categoría (ej: 🍏 Frutas y Verduras)
                     current_category = line
 
-            print(f"Self-Healing: Reconstructed {recovered_count} items with their categories.")
+            if recovered_count > 0:
+                print(f"Self-Healing: Reconstructed {recovered_count} items. Forcing message recreation...")
+                # Forzar recreación del mensaje para que los IDs de los botones coincidan
+                database.set_state("master_message_id", None)
 
     except Exception as e:
         print(f"Sync/Sanity Error: {e}")
