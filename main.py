@@ -121,7 +121,6 @@ async def debug_status(x_auth_token: str = Header(None)):
 
 if __name__ == "__main__":
     import uvicorn
-    # En desarrollo local usamos 127.0.0.1 por seguridad. 
-    # Render/Railway sobrescribirán el puerto.
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    # En Render/Railway necesitamos 0.0.0.0 para ser accesibles desde el exterior
+    uvicorn.run(app, host="0.0.0.0", port=port)
