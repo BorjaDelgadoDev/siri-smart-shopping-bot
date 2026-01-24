@@ -130,3 +130,47 @@ async def update_master_message(bot: Bot):
             
     except Exception as e:
         print(f"Fatal error sending message: {e}")
+
+async def audit_and_fix(bot: Bot):
+    """Real-time audit of the chat state. Returns a diagnostic report."""
+    chat_id = os.getenv("CHAT_ID")
+    if not chat_id:
+        return {"error": "CHAT_ID not configured"}
+
+    report = {
+        "timestamp": os.popen("date").read().strip(),
+        "local_state": {
+            "master_message_id": database.get_state("master_message_id"),
+            "items_in_db": len(database.get_all_items())
+        },
+        "remote_state": {},
+        "issues": [],
+        "actions_taken": []
+    }
+
+    try:
+        chat = await bot.get_chat(chat_id)
+        pinned = chat.pinned_message
+        
+        if pinned:
+            report["remote_state"]["pinned_message_id"] = pinned.message_id
+            report["remote_state"]["pinned_by_bot"] = (pinned.from_user.id == bot.id)
+            report["remote_state"]["pinned_text_snippet"] = pinned.text[:30] + "..." if pinned.text else None
+        else:
+            report["remote_state"]["pinned_message_id"] = None
+            report["issues"].append("No message is pinned in this chat.")
+
+        # Diagnosis
+        db_id = report["local_state"]["master_message_id"]
+        pin_id = report["remote_state"].get("pinned_message_id")
+
+        if pin_id and str(db_id) != str(pin_id):
+            report["issues"].append(f"State mismatch: DB thinks {db_id}, Telegram has {pin_id} pinned.")
+            # Auto-fix: Adopt the pinned one
+            database.set_state("master_message_id", pin_id)
+            report["actions_taken"].append(f"Updated local master_message_id to {pin_id}")
+
+    except Exception as e:
+        report["error"] = str(e)
+
+    return report

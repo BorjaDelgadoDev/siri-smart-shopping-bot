@@ -100,6 +100,16 @@ async def telegram_webhook(request: Request):
 
     return {"ok": True}
 
+@app.get("/audit")
+async def chat_audit(x_auth_token: str = Header(None)):
+    """Secret endpoint for real-time chat monitoring and fixing."""
+    expected_token = os.getenv("SIRI_AUTH_TOKEN")
+    if not expected_token or x_auth_token != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    report = await bot_logic.audit_and_fix(bot)
+    return report
+
 @app.get("/debug/status")
 async def debug_status(x_auth_token: str = Header(None)):
     """Remote monitoring endpoint."""
