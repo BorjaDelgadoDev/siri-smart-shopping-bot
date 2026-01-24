@@ -60,14 +60,11 @@ def process_text(text):
         print("Warning: GEMINI_API_KEY not found. Returning empty list.")
         return []
     
-    try:
-        response = model.generate_content(text)
-        # Limpieza simple por si la IA añade markdown ```json
-        clean_response = response.text.strip().replace("```json", "").replace("```", "")
-        return json.loads(clean_response)
-    except Exception as e:
-        print(f"Error processing AI: {e}")
-        return []
+    # try/except removido para que main.py capture el error exacto en flight_recorder
+    response = model.generate_content(text)
+    # Limpieza simple por si la IA añade markdown ```json
+    clean_response = response.text.strip().replace("```json", "").replace("```", "")
+    return json.loads(clean_response)
 
 if __name__ == "__main__":
     # Test simple (no funcionará sin API key real en el entorno)
