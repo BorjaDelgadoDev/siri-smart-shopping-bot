@@ -129,6 +129,9 @@ async def update_master_message(bot: Bot):
 
     # Intentar obtener ID sincronizado
     master_message_id = database.get_state("master_message_id")
+    # Convertir "None" string a None real
+    if master_message_id == "None" or master_message_id is None:
+        master_message_id = None
 
     # 3. Si tenemos un ID (recuperado o local), intentamos editar
     if master_message_id:
