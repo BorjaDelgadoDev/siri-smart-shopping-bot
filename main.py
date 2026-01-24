@@ -6,8 +6,6 @@ import ai_handler
 import database
 import bot_logic
 from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-import json
 
 load_dotenv()
 
