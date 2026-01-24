@@ -55,25 +55,31 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
 
     # Procesamiento asíncrono
     raw_text = request.text
-    print(f"Received from Siri: {raw_text}")
+    print(f"DIAGNOSTIC: Siri text received: '{raw_text}'")
     
     products = ai_handler.process_text(raw_text)
+    print(f"DIAGNOSTIC: AI returned: {products}")
     
+    if not products:
+        print("DIAGNOSTIC: No products found by AI. Skipping loop.")
+
     for item in products:
         name = item.get("product")
         quantity = item.get("quantity", "1")
-        category = item.get("category", "Otros 📦")
+        category = item.get("category", "13. 📦 Otros")
         
         if name:
             database.add_item(name, quantity, category)
-            print(f"Added item: {name} ({quantity}) in {category}")
+            print(f"DIAGNOSTIC: Added to DB: {name} ({quantity}) in {category}")
 
     # Actualizar mensaje maestro en Telegram
     if bot:
         try:
+            print("DIAGNOSTIC: Triggering Telegram message update...")
             await bot_logic.update_master_message(bot)
+            print("DIAGNOSTIC: Telegram update call finished.")
         except Exception as e:
-            print(f"Error updating Telegram: {e}")
+            print(f"DIAGNOSTIC Error updating Telegram: {e}")
 
     return {"status": "success", "added": len(products)}
 
