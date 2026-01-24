@@ -46,17 +46,39 @@ async def update_master_message(bot: Bot):
     # 1. Intentar obtener ID de la base de datos
     master_message_id = database.get_state("master_message_id")
 
-    # 2. Sincronización proactiva: Si no hay ID o cada N veces, verificamos el anclado de Telegram
-    # Para máxima estabilidad, si no tenemos ID local, preguntamos a Telegram SIEMPRE.
-    if not master_message_id:
-        try:
-            chat = await bot.get_chat(chat_id)
-            if chat.pinned_message and chat.pinned_message.from_user.id == bot.id:
-                master_message_id = str(chat.pinned_message.message_id)
-                database.set_state("master_message_id", master_message_id)
-                print(f"Sync: Recovered master_id {master_message_id} from pinned message.")
-        except Exception as e:
-            print(f"Sync Error: Could not fetch pinned message: {e}")
+    # 2. Sincronización proactiva y "Self-Healing"
+    try:
+        chat = await bot.get_chat(chat_id)
+        pinned = chat.pinned_message
+        
+        # Si hay un mensaje fijado del bot, lo usamos como fuente de verdad
+        if pinned and pinned.from_user.id == bot.id:
+            master_message_id = str(pinned.message_id)
+            database.set_state("master_message_id", master_message_id)
+            
+            # ¡MAGIA DE RECUPERACIÓN!: Si mi base de datos está vacía pero el mensaje tiene botones, recuperamos
+            current_items = database.get_all_items()
+            if not current_items and pinned.reply_markup:
+                print("Self-Healing: Database empty but pinned message found. Recovering items...")
+                # Recorremos los botones para sacar los nombres de los productos
+                for row in pinned.reply_markup.inline_keyboard:
+                    for button in row:
+                        if button.callback_data.startswith("buy_"):
+                            # El texto del botón suele ser "✅ Producto", le quitamos el emoji
+                            btn_text = button.text.replace("✅ ", "").strip()
+                            # Intentamos deducir la categoría del texto del mensaje
+                            # (Buscamos la categoría que está justo encima del producto)
+                            # Por ahora, para ser seguros, los metemos en la categoría detectada en el texto si es posible
+                            # o simplemente en la categoría que ponga la lista renderizada.
+                            # Para simplificar la recuperación inicial, los marcamos como recuperados.
+                            database.sync_item(btn_text, "1", "📦 Recuperados (Sincronizando...)")
+                
+                # Refrescamos la lista con lo recuperado antes de seguir
+                text, reply_markup = render_list()
+                print("Self-Healing: Recovery complete.")
+
+    except Exception as e:
+        print(f"Sync/Recovery Error: {e}")
 
     # 3. Si tenemos un ID (recuperado o local), intentamos editar
     if master_message_id:

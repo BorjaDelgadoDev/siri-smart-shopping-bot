@@ -55,6 +55,20 @@ def add_item(name, quantity, category):
     conn.commit()
     conn.close()
 
+def sync_item(name, quantity, category):
+    """Especial para recuperación: Solo añade si no existe EXACTAMENTE para evitar ruidos de parsing."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Verificamos si ya existe para no duplicar en el proceso de sanación
+    cursor.execute("SELECT id FROM items WHERE LOWER(name) = LOWER(?)", (name,))
+    if not cursor.fetchone():
+        cursor.execute(
+            "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
+            (name, quantity, category)
+        )
+    conn.commit()
+    conn.close()
+
 def get_all_items():
     conn = get_connection()
     cursor = conn.cursor()
