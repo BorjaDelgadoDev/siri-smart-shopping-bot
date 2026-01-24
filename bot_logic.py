@@ -35,7 +35,7 @@ def render_list():
     return text, reply_markup
 
 async def update_master_message(bot: Bot):
-    """Update the existing master message or send a new one."""
+    """Update the existing master message or send a new one with robust sync."""
     text, reply_markup = render_list()
     
     chat_id = os.getenv("CHAT_ID")
@@ -46,17 +46,19 @@ async def update_master_message(bot: Bot):
     # 1. Intentar obtener ID de la base de datos
     master_message_id = database.get_state("master_message_id")
 
-    # 2. Si no hay ID (Render reinició), intentar buscar el mensaje fijado del bot
+    # 2. Sincronización proactiva: Si no hay ID o cada N veces, verificamos el anclado de Telegram
+    # Para máxima estabilidad, si no tenemos ID local, preguntamos a Telegram SIEMPRE.
     if not master_message_id:
         try:
             chat = await bot.get_chat(chat_id)
             if chat.pinned_message and chat.pinned_message.from_user.id == bot.id:
-                master_message_id = chat.pinned_message.message_id
+                master_message_id = str(chat.pinned_message.message_id)
                 database.set_state("master_message_id", master_message_id)
-                print(f"Recovered master_message_id from pinned message: {master_message_id}")
+                print(f"Sync: Recovered master_id {master_message_id} from pinned message.")
         except Exception as e:
-            print(f"Could not recover pinned message: {e}")
+            print(f"Sync Error: Could not fetch pinned message: {e}")
 
+    # 3. Si tenemos un ID (recuperado o local), intentamos editar
     if master_message_id:
         try:
             await bot.edit_message_text(
@@ -66,19 +68,21 @@ async def update_master_message(bot: Bot):
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
             )
-            return # Éxito total
+            return # Éxito total: mensaje actualizado.
         except Exception as e:
             err_str = str(e).lower()
             if "message is not modified" in err_str:
-                return
-            # Solo si el mensaje fue borrado intentamos mandar uno nuevo
+                return # Nada que cambiar, salimos felices.
+            
+            # Si el mensaje ha desaparecido o no es editable, procedemos a crear uno nuevo
             if "message to edit not found" in err_str or "message can't be edited" in err_str:
-                print(f"Message {master_message_id} lost. Sending new one.")
+                print(f"Master msg {master_message_id} lost/un-editable. Creating new.")
             else:
-                print(f"Error editing message {master_message_id}: {e}")
-                return # Si es otro error (ej: red), no duplicamos
+                print(f"Critical Edit Error for {master_message_id}: {e}")
+                # En caso de error de red o similar, NO duplicamos, reintentamos después
+                return 
 
-    # 3. Solo llegamos aquí si NO había mensaje o si el anterior fue borrado
+    # 4. Solo llegamos aquí si NO hay mensaje o el anterior es inservible
     try:
         msg = await bot.send_message(
             chat_id=chat_id,
@@ -86,19 +90,21 @@ async def update_master_message(bot: Bot):
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
-        database.set_state("master_message_id", msg.message_id)
+        new_id = msg.message_id
+        database.set_state("master_message_id", new_id)
         
-        # Fijar el nuevo mensaje
+        # Limpieza y Anclado
         try:
-            await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
-            # Intentar borrar el anterior (limpieza extrema)
-            if master_message_id and int(master_message_id) != msg.message_id:
+            # Borramos el rastro del "fantasma" anterior si existía para evitar duplicados visuales
+            if master_message_id and int(master_message_id) != new_id:
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-                except Exception:
-                    pass
-        except Exception:
+                except Exception: pass
+            
+            # Fijamos el nuevo para la próxima vez
+            await bot.pin_chat_message(chat_id=chat_id, message_id=new_id, disable_notification=True)
+        except Exception: 
             pass
             
     except Exception as e:
-        print(f"Critical error sending message: {e}")
+        print(f"Fatal error sending message: {e}")
