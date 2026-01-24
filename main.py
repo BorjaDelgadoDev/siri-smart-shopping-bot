@@ -34,7 +34,7 @@ async def startup_event():
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "Smart Shopping List Bot is running", "version": "1.1"}
+    return {"status": "online", "message": "Smart Shopping List Bot is running", "version": "1.2"}
 
 @app.post("/siri")
 async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):

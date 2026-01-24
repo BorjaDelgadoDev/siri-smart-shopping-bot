@@ -121,7 +121,8 @@ async def update_master_message(bot: Bot):
             if master_message_id and int(master_message_id) != new_id:
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-                except Exception: pass
+                except Exception:
+                    pass
             
             # Fijamos el nuevo para la próxima vez
             await bot.pin_chat_message(chat_id=chat_id, message_id=new_id, disable_notification=True)
