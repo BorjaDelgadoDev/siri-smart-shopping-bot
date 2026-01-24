@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: shopping-list-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+        placeholder: "Token from @BotFather"
+      - key: GEMINI_API_KEY
+        sync: false
+        placeholder: "Key from Google AI Studio"
+      - key: CHAT_ID
+        sync: false
+        placeholder: "Telegram Chat ID (e.g. -100...)"
+      - key: SIRI_AUTH_TOKEN
+        sync: false
+        placeholder: "Your custom secret for Siri"
+      - key: AUTHORIZED_USERS
+        sync: false
+        placeholder: "Your Telegram User ID"
+      - key: BASE_URL
+        sync: false
+        placeholder: "Initial setup: Leave empty or add your Render URL after deploy"
+      - key: PORT
+        value: 8000
+    # SQLite storage is ephemeral on Render free tier, but we use Pinned Messages for recovery
