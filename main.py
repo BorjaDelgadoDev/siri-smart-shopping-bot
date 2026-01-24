@@ -21,8 +21,18 @@ class SiriRequest(BaseModel):
     text: str
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     database.init_db()
+    
+    # Automatización del Webhook si existe BASE_URL
+    base_url = os.getenv("BASE_URL")
+    if base_url and bot:
+        webhook_url = f"{base_url.rstrip('/')}/webhook/telegram"
+        try:
+            await bot.set_webhook(url=webhook_url)
+            print(f"Webhook set automatically to: {webhook_url}")
+        except Exception as e:
+            print(f"Error setting webhook: {e}")
 
 @app.get("/")
 def read_root():

@@ -38,9 +38,9 @@ Sigue estos pasos en orden para tener tu bot funcionando al 100%:
 
 ### 2️⃣ Clave de Inteligencia Artificial
 1. Ve a [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Crea una **API Key** gratuita para Gemini. Esta es la que categorizará tus productos.
+2. Crea una **API Key** gratuita para Gemini.
 
-### 3️⃣ Despliegue del Servidor (Render)
+### 3️⃣ Despliegue del Servidor (Render/Railway)
 1. Haz un Fork de este repositorio en tu cuenta de GitHub.
 2. Crea una cuenta en [Render.com](https://render.com) y pulsa en **New > Web Service**.
 3. Conecta tu repositorio de GitHub.
@@ -49,16 +49,11 @@ Sigue estos pasos en orden para tener tu bot funcionando al 100%:
    - `GEMINI_API_KEY`: Tu clave de Google.
    - `CHAT_ID`: El ID del grupo de Telegram.
    - `SIRI_AUTH_TOKEN`: Una contraseña inventada por ti (ej: `MiCasaSegura123`).
-   - `AUTHORIZED_USERS`: Tu ID de Telegram (para que nadie más pueda usar tu bot).
-5. Pulsa **Deploy**. Una vez esté "Live", copia la URL (ej: `https://mi-bot.onrender.com`).
+   - `AUTHORIZED_USERS`: Tu ID de Telegram.
+   - `BASE_URL`: La URL pública que te dé Render (ej: `https://mi-bot.onrender.com`). **¡Esto activará los botones automáticamente!**
+5. Pulsa **Deploy**.
 
-### 4️⃣ Activación de Botones (Webhook)
-Para que Telegram sepa dónde enviar los clics de los botones:
-1. Abre una terminal en tu ordenador.
-2. Ejecuta: `python3 set_webhook.py https://tu-url-de-render.com`
-3. Si recibes `{"ok":true}`, los botones ya funcionan.
-
-### 5️⃣ Configuración de Siri (Atajo de iOS)
+### 4️⃣ Configuración de Siri (Atajo de iOS)
 1. Abre la app **Atajos** en tu iPhone y crea uno nuevo llamado *"Añade a la compra"*.
 2. Añade la acción **"Dictar texto"**.
 3. Añade la acción **"Obtener contenido de URL"**:
