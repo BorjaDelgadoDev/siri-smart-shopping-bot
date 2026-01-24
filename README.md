@@ -39,7 +39,7 @@
 3. **Chat ID**: El ID de tu grupo (puedes sacarlo enviando un mensaje a [@userinfobot](https://t.me/userinfobot)).
 
 ### Pasos:
-1. Pulsa el botón de **"Deploy to Render"** de arriba.
+1. Pulsa el botón de **"Deploy to Render"** de arriba. (Si has hecho Fork, recuerda actualizar la URL en el enlace del botón en `README.md`).
 2. Rellena los campos que te pedirá Render (Tokens e IDs).
 3. Una vez esté "Live", ya puedes configurar tu Atajo de Siri.
 
@@ -52,9 +52,9 @@ Es la pieza final del puzzle. Crea un Atajo en tu iPhone:
 | Paso | Acción | Configuración |
 | :--- | :--- | :--- |
 | **1** | 🎤 **Dictar texto** | Idioma: Español |
-| **2** | 🌐 **Obtener contenido de URL** | URL: `https://tu-app.onrender.com/siri` |
+| **2** | 🌐 **Obtener contenido de URL** | URL: `https://TU-URL-DE-RENDER.com/siri` |
 | **3** | ⚙️ **Método** | `POST` |
-| **4** | 🔑 **Encabezados** | `X-Auth-Token` : `TuSecretoElegido` |
+| **4** | 🔑 **Encabezados** | `X-Auth-Token` : `Tu Token (SIRI_AUTH_TOKEN)` |
 | **5** | 📦 **Cuerpo JSON** | Llave: `text`, Valor: `Texto dictado` |
 
 ---
