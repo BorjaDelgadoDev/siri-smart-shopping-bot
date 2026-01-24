@@ -34,8 +34,84 @@ def render_list():
     reply_markup = InlineKeyboardMarkup(keyboard)
     return text, reply_markup
 
+async def ensure_db_synced(bot: Bot):
+    """Ensure the local DB is in sync with Telegram's pinned message. MUST be called first."""
+    chat_id = os.getenv("CHAT_ID")
+    if not chat_id:
+        return
+        
+    try:
+        # 1. Asegurar inicialización
+        try:
+            await bot.initialize()
+        except Exception: pass
+
+        # 2. Consultar Telegram
+        chat = await bot.get_chat(chat_id)
+        pinned = chat.pinned_message
+        if not pinned:
+            return
+
+        # 3. Verificar si el bot es el autor
+        bot_me = await bot.get_me()
+        if pinned.from_user.id != bot_me.id:
+            return
+
+        # 4. Actualizar ID del mensaje maestro localmente
+        database.set_state("master_message_id", str(pinned.message_id))
+
+        # 5. ¡SANACIÓN!: Si la DB está vacía, recuperamos de los botones y el texto
+        current_items = database.get_all_items()
+        if not current_items and pinned.reply_markup and pinned.text:
+            print(f"Self-Healing: DB empty. Recovering items from pin {pinned.message_id}...")
+            
+            # Mapear botones a nombres
+            item_button_names = []
+            for row in pinned.reply_markup.inline_keyboard:
+                for button in row:
+                    if button.callback_data.startswith("buy_"):
+                        item_button_names.append(button.text.replace("✅ ", "").strip())
+
+            # Analizar el texto para encontrar categorías
+            lines = pinned.text.split("\n")
+            current_category = "📦 Otros"
+            recovered_count = 0
+
+            # Lista de nuestras categorías conocidas (para comparar emojis/nombres)
+            # No necesitamos la lista exacta, cualquier línea que no empiece por punto ni esté vacía 
+            # después del título es una categoría.
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith("📝") or "Lista de la Compra" in line:
+                    continue
+                
+                if line.startswith("•"):
+                    # Es un producto. Formato: • Nombre (Cantidad) o • Nombre
+                    name_part = line.replace("•", "").strip()
+                    # Si el nombre está en nuestros botones, lo recuperamos
+                    # Quitamos la cantidad del nombre para buscar en botones
+                    base_name = name_part.split("(")[0].strip()
+                    if base_name in item_button_names:
+                        quantity = "1"
+                        if "(" in name_part and ")" in name_part:
+                            quantity = name_part.split("(")[1].split(")")[0]
+                        
+                        database.sync_item(base_name, quantity, current_category)
+                        recovered_count += 1
+                else:
+                    # Es una categoría (ej: 🍏 Frutas y Verduras)
+                    current_category = line
+
+            print(f"Self-Healing: Reconstructed {recovered_count} items with their categories.")
+
+    except Exception as e:
+        print(f"Sync/Sanity Error: {e}")
+
 async def update_master_message(bot: Bot):
     """Update the existing master message or send a new one with robust sync."""
+    # Sincronización obligatoria antes de nada (por si Render reinició)
+    await ensure_db_synced(bot)
+    
     text, reply_markup = render_list()
     
     chat_id = os.getenv("CHAT_ID")
@@ -43,49 +119,8 @@ async def update_master_message(bot: Bot):
         print("Error: CHAT_ID not set in .env")
         return
 
-    # 1. Intentar obtener ID de la base de datos
+    # Intentar obtener ID sincronizado
     master_message_id = database.get_state("master_message_id")
-
-    # 2. Sincronización proactiva y "Self-Healing"
-    try:
-        # Asegurar inicialización para v20+
-        try:
-            await bot.initialize()
-        except Exception:
-            pass
-
-        chat = await bot.get_chat(chat_id)
-        pinned = chat.pinned_message
-        bot_me = await bot.get_me()
-        
-        # Si hay un mensaje fijado del bot, lo usamos como fuente de verdad
-        if pinned and pinned.from_user.id == bot_me.id:
-            master_message_id = str(pinned.message_id)
-            database.set_state("master_message_id", master_message_id)
-            
-            # ¡MAGIA DE RECUPERACIÓN!: Si mi base de datos está vacía pero el mensaje tiene botones, recuperamos
-            current_items = database.get_all_items()
-            if not current_items and pinned.reply_markup:
-                print("Self-Healing: Database empty but pinned message found. Recovering items...")
-                # Recorremos los botones para sacar los nombres de los productos
-                for row in pinned.reply_markup.inline_keyboard:
-                    for button in row:
-                        if button.callback_data.startswith("buy_"):
-                            # El texto del botón suele ser "✅ Producto", le quitamos el emoji
-                            btn_text = button.text.replace("✅ ", "").strip()
-                            # Intentamos deducir la categoría del texto del mensaje
-                            # (Buscamos la categoría que está justo encima del producto)
-                            # Por ahora, para ser seguros, los metemos en la categoría detectada en el texto si es posible
-                            # o simplemente en la categoría que ponga la lista renderizada.
-                            # Para simplificar la recuperación inicial, los marcamos como recuperados.
-                            database.sync_item(btn_text, "1", "📦 Recuperados (Sincronizando...)")
-                
-                # Refrescamos la lista con lo recuperado antes de seguir
-                text, reply_markup = render_list()
-                print("Self-Healing: Recovery complete.")
-
-    except Exception as e:
-        print(f"Sync/Recovery Error: {e}")
 
     # 3. Si tenemos un ID (recuperado o local), intentamos editar
     if master_message_id:
@@ -157,11 +192,8 @@ async def audit_and_fix(bot: Bot):
     }
 
     try:
-        # Asegurar inicialización antes de acceder a bot.id
-        try:
-            await bot.initialize()
-        except Exception:
-            pass
+        # Sincronización obligatoria antes de auditar
+        await ensure_db_synced(bot)
 
         chat = await bot.get_chat(chat_id)
         pinned = chat.pinned_message

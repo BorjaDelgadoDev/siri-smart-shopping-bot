@@ -49,8 +49,11 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     if not expected_token or x_auth_token != expected_token:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Procesamiento asíncrono (conceptualmente, para que Siri no espere demasiado)
-    # Por ahora procesamos y guardamos antes de responder, si Gemini es rápido
+    # Sincronización proactiva: Asegurar recuperación si Render reinició
+    if bot:
+        await bot_logic.ensure_db_synced(bot)
+
+    # Procesamiento asíncrono
     raw_text = request.text
     print(f"Received from Siri: {raw_text}")
     
@@ -81,7 +84,11 @@ async def telegram_webhook(request: Request):
     update = Update.de_json(data, bot)
     chat_id_env = os.getenv("CHAT_ID")
     
-    # 1. Procesar CallbackQueries (Botón Comprar)
+    # 1. Sincronización proactiva antes de gestionar botones
+    if bot:
+        await bot_logic.ensure_db_synced(bot)
+
+    # 2. Procesar CallbackQueries (Botón Comprar)
     if update.callback_query:
         query = update.callback_query
         data_recv = query.data
@@ -89,7 +96,9 @@ async def telegram_webhook(request: Request):
         if data_recv.startswith("buy_"):
             item_id = data_recv.split("_")[1]
             database.delete_item(item_id)
+            # 1. Responder inmediatamente para quitar el "Cargando..."
             await query.answer("¡Comprado!")
+            # 2. Después actualizamos la lista
             await bot_logic.update_master_message(bot)
         return {"ok": True}
 
