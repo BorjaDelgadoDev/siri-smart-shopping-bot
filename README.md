@@ -11,7 +11,6 @@
 <div align="center">
   <h1>🛒 Siri Smart Shopping List Bot</h1>
   <p><b>Transforma tu hogar con una lista de la compra inteligente, impulsada por IA.</b></p>
-  <p>Olvida el papel y los mensajes sueltos. Dicta, organiza y compra con un toque.</p>
 </div>
 
 ---
