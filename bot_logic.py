@@ -150,12 +150,19 @@ async def audit_and_fix(bot: Bot):
     }
 
     try:
+        # Asegurar inicialización antes de acceder a bot.id
+        try:
+            await bot.initialize()
+        except Exception:
+            pass
+
         chat = await bot.get_chat(chat_id)
         pinned = chat.pinned_message
         
         if pinned:
             report["remote_state"]["pinned_message_id"] = pinned.message_id
-            report["remote_state"]["pinned_by_bot"] = (pinned.from_user.id == bot.id)
+            bot_me = await bot.get_me()
+            report["remote_state"]["pinned_by_bot"] = (pinned.from_user.id == bot_me.id)
             report["remote_state"]["pinned_text_snippet"] = pinned.text[:30] + "..." if pinned.text else None
         else:
             report["remote_state"]["pinned_message_id"] = None
