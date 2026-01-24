@@ -40,7 +40,7 @@ graph LR
 
 ---
 
-## 🛠️ Guía Paso a Paso (Para Humanos)
+## 🛠️ Guía Paso a Paso
 
 No importa si no sabes nada de código. Sigue estos pasos y lo tendrás listo en 10 minutos:
 
