@@ -48,11 +48,18 @@ async def update_master_message(bot: Bot):
 
     # 2. Sincronización proactiva y "Self-Healing"
     try:
+        # Asegurar inicialización para v20+
+        try:
+            await bot.initialize()
+        except Exception:
+            pass
+
         chat = await bot.get_chat(chat_id)
         pinned = chat.pinned_message
+        bot_me = await bot.get_me()
         
         # Si hay un mensaje fijado del bot, lo usamos como fuente de verdad
-        if pinned and pinned.from_user.id == bot.id:
+        if pinned and pinned.from_user.id == bot_me.id:
             master_message_id = str(pinned.message_id)
             database.set_state("master_message_id", master_message_id)
             
