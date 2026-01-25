@@ -57,7 +57,8 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     expected_token = os.getenv("SIRI_AUTH_TOKEN")
     
     # Validación de seguridad
-    if not expected_token or x_auth_token != expected_token:
+    # Comparación insensible a mayúsculas para evitar errores en Shortcuts
+    if not expected_token or x_auth_token.lower() != expected_token.lower():
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Procesamiento asíncrono
