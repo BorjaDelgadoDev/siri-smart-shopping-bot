@@ -58,15 +58,27 @@ async def ensure_db_synced(bot: Bot):
         if pinned.from_user.id != bot_me.id:
             return
 
-        # 4. Actualizar ID del mensaje maestro localmente
-        database.set_state("master_message_id", str(pinned.message_id))
+        # 4. Obtener estado actual
+        current_master_id = database.get_state("master_message_id")
+        local_items = database.get_all_items()
 
-        # 5. ¡SANACIÓN!: Recuperamos siempre que el pin tenga botones (nuestro backup)
-        if pinned.reply_markup and pinned.text:
-            print(f"Self-Healing: Checking recovery from pin {pinned.message_id}...")
+        # 5. FUENTE DE VERDAD: Adoptar el pin de Telegram si es nuestro
+        # Esto previene duplicados si el bot se reinicia pero el pin sigue ahí.
+        if str(current_master_id) != str(pinned.message_id):
+            print(f"Sync: Adopting Telegram Pin {pinned.message_id} as master.")
+            database.set_state("master_message_id", str(pinned.message_id))
+            current_master_id = str(pinned.message_id)
+
+        # 6. ¡SANACIÓN!: Recuperamos solo si la DB está vacía pero SABÍAMOS que debería haber items
+        # (Esto indica una pérdida accidental de datos en la DB local)
+        should_heal = not local_items and database.get_state("had_items_recently") == "True"
+        
+        if should_heal and pinned.reply_markup and pinned.text:
+            print(f"Self-Healing: DB empty & No Master ID. Recovering from pin {pinned.message_id}...")
+            # ... (resto de la lógica igual)
             
             # Mapear botones a nombres e IDs
-            item_button_map = {}  # {nombre: id_del_boton}
+            item_button_map = {}
             for row in pinned.reply_markup.inline_keyboard:
                 for button in row:
                     if button.callback_data.startswith("buy_"):
@@ -74,17 +86,9 @@ async def ensure_db_synced(bot: Bot):
                         button_id = button.callback_data.replace("buy_", "")
                         item_button_map[button_name] = button_id
 
-            # Analizar el texto para encontrar categorías
             lines = pinned.text.split("\n")
             current_category = "📦 Otros"
             recovered_count = 0
-
-            # Limpiar la DB antes de recuperar para evitar duplicados
-            current_items = database.get_all_items()
-            if current_items:
-                print(f"Self-Healing: DB has {len(current_items)} items. Clearing for clean recovery...")
-                for item_id, _, _, _ in current_items:
-                    database.delete_item(item_id)
 
             for line in lines:
                 line = line.strip()
@@ -92,24 +96,19 @@ async def ensure_db_synced(bot: Bot):
                     continue
                 
                 if line.startswith("•"):
-                    # Es un producto. Formato: • Nombre (Cantidad) o • Nombre
                     name_part = line.replace("•", "").strip()
                     base_name = name_part.split("(")[0].strip()
-                    
                     if base_name in item_button_map:
                         quantity = "1"
                         if "(" in name_part and ")" in name_part:
                             quantity = name_part.split("(")[1].split(")")[0]
-                        
                         database.sync_item(base_name, quantity, current_category)
                         recovered_count += 1
                 else:
-                    # Es una categoría (ej: 🍏 Frutas y Verduras)
                     current_category = line
 
             if recovered_count > 0:
-                print(f"Self-Healing: Reconstructed {recovered_count} items. Forcing message recreation...")
-                # Forzar recreación del mensaje para que los IDs de los botones coincidan
+                print(f"Self-Healing Cache: Force new message to sync button IDs.")
                 database.set_state("master_message_id", None)
 
     except Exception as e:
@@ -154,11 +153,20 @@ async def update_master_message(bot: Bot):
                 print(f"Master msg {master_message_id} lost/un-editable. Creating new.")
             else:
                 print(f"Critical Edit Error for {master_message_id}: {e}")
-                # En caso de error de red o similar, NO duplicamos, reintentamos después
-                return 
+                # En caso de error crítico, asumimos que el mensaje ya no sirve
 
-    # 4. Solo llegamos aquí si NO hay mensaje o el anterior es inservible
+    # 4. Fallback: Crear mensaje nuevo
     try:
+        # Antes de enviar uno nuevo, intentamos BORRAR el viejo y DESANCLAR TODO
+        # para que no queden múltiples burbujas de "mensaje fijado".
+        try:
+            print("Pin-Cleanup: Cleaning up old pins before sending new master.")
+            await bot.unpin_all_chat_messages(chat_id=chat_id)
+            if master_message_id:
+                await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
+        except Exception:
+            pass
+
         msg = await bot.send_message(
             chat_id=chat_id,
             text=text,
@@ -168,22 +176,15 @@ async def update_master_message(bot: Bot):
         new_id = msg.message_id
         database.set_state("master_message_id", new_id)
         
-        # Limpieza y Anclado
+        # Anclado silencioso
         try:
-            # Borramos el rastro del "fantasma" anterior si existía para evitar duplicados visuales
-            if master_message_id and int(master_message_id) != new_id:
-                try:
-                    await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
-                except Exception:
-                    pass
-            
-            # Fijamos el nuevo para la próxima vez
             await bot.pin_chat_message(chat_id=chat_id, message_id=new_id, disable_notification=True)
-        except Exception: 
-            pass
+            print(f"Pin-Cleanup: New master pinned: {new_id}")
+        except Exception as pin_err: 
+            print(f"Warning pinning message: {pin_err}")
             
     except Exception as e:
-        print(f"Fatal error sending message: {e}")
+        print(f"Fatal error sending master message: {e}")
 
 async def audit_and_fix(bot: Bot):
     """Real-time audit of the chat state. Returns a diagnostic report."""

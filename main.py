@@ -73,6 +73,8 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
         products = ai_handler.process_text(raw_text)
         DIAGNOSTIC_DATA["last_ai_response"] = products
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # Imprimir error completo para debug
         DIAGNOSTIC_DATA["last_error"] = str(e)
         products = []
     
@@ -88,6 +90,8 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
         
         if name:
             database.add_item(name, quantity, category)
+            # Al añadir algo, marcamos que tenemos items para permitir sanación si se pierden
+            database.set_state("had_items_recently", "True")
             print(f"DIAGNOSTIC: Added to DB: {name} ({quantity}) in {category}")
 
     # Actualizar mensaje maestro en Telegram
@@ -120,6 +124,14 @@ async def telegram_webhook(request: Request):
         if data_recv.startswith("buy_"):
             item_id = data_recv.split("_")[1]
             database.delete_item(item_id)
+            
+            # Si la lista se queda vacía tras comprar, marcamos que es INTENCIONADO
+            # para que 'ensure_db_synced' no intente recuperarlos del pin.
+            current_items = database.get_all_items()
+            if not current_items:
+                database.set_state("had_items_recently", "") # Empty string = False-ish
+                print("Janitor: List emptied intentionally via button.")
+            
             # 1. Responder inmediatamente para quitar el "Cargando..."
             await query.answer("¡Comprado!")
             # 2. Después actualizamos la lista
