@@ -63,7 +63,9 @@ async def sync_and_recover(bot: Bot):
         # 2. Si la base de datos está vacía, recuperar items del texto del mensaje
         local_items = database.get_all_items()
         if not local_items and pinned.text:
-            print(f"Sync: DB empty. Attempting recovery from pin {pinned.message_id}...")
+            # Solo intentamos "sanar" si NO hemos marcado la lista como vacía intencionadamente
+            if database.get_state("had_items_recently") != "":
+                print(f"Sync: DB empty (Data Loss). Attempting recovery from pin {pinned.message_id}...")
             
             # Mapear botones a IDs para mantener consistencia si es posible
             item_button_map = {}
