@@ -36,7 +36,7 @@ async def startup_event():
         print("Bot initialized properly.")
         
         # Sincronización única al inicio: Adoptar pin de Telegram si existe
-        await bot_logic.adopt_telegram_pin(bot)
+        await bot_logic.sync_and_recover(bot)
 
     # Automatización del Webhook si existe BASE_URL
     base_url = os.getenv("BASE_URL")

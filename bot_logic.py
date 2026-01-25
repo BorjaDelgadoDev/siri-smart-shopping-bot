@@ -33,8 +33,11 @@ def render_list():
     reply_markup = InlineKeyboardMarkup(keyboard)
     return text, reply_markup
 
-async def adopt_telegram_pin(bot: Bot):
-    """On startup ONLY: Adopt Telegram's pinned message as master if it's ours."""
+async def sync_and_recover(bot: Bot):
+    """
+    Synchronizes local state with Telegram's pinned message.
+    If the database is empty (e.g., after a Render restart), it recovers items from the pin text.
+    """
     chat_id = os.getenv("CHAT_ID")
     if not chat_id:
         return
@@ -48,28 +51,58 @@ async def adopt_telegram_pin(bot: Bot):
         chat = await bot.get_chat(chat_id)
         pinned = chat.pinned_message
         if not pinned:
-            print("Startup Sync: No pinned message found.")
             return
 
         bot_me = await bot.get_me()
         if pinned.from_user.id != bot_me.id:
-            print("Startup Sync: Pinned message is not from this bot.")
             return
 
-        # Adoptar el pin de Telegram como master
-        current_master_id = database.get_state("master_message_id")
-        if str(current_master_id) != str(pinned.message_id):
-            print(f"Startup Sync: Adopting Telegram Pin {pinned.message_id} (was {current_master_id}).")
-            database.set_state("master_message_id", str(pinned.message_id))
-        else:
-            print(f"Startup Sync: Master ID {current_master_id} is already in sync.")
+        # 1. Adoptar el ID del mensaje maestro
+        database.set_state("master_message_id", str(pinned.message_id))
+
+        # 2. Si la base de datos está vacía, recuperar items del texto del mensaje
+        local_items = database.get_all_items()
+        if not local_items and pinned.text:
+            print(f"Sync: DB empty. Attempting recovery from pin {pinned.message_id}...")
+            
+            lines = pinned.text.split("\n")
+            current_category = "13. 📦 Otros"
+            recovered_count = 0
+
+            for line in lines:
+                line = line.strip()
+                if not line or "Lista de la Compra" in line:
+                    continue
+                
+                # Detectar categorías (no empiezan por • y no son el título)
+                if not line.startswith("•") and not line.startswith("📝"):
+                    current_category = line
+                    continue
+
+                if line.startswith("•"):
+                    name_part = line.replace("•", "").strip()
+                    base_name = name_part.split("(")[0].strip()
+                    
+                    # Extraer cantidad si existe: "Item (2 kilos)"
+                    quantity = "1"
+                    if "(" in name_part and ")" in name_part:
+                        quantity = name_part.split("(")[1].split(")")[0]
+                    
+                    database.add_item(base_name, quantity, current_category)
+                    recovered_count += 1
+            
+            if recovered_count > 0:
+                print(f"Sync: Recovered {recovered_count} items from pin text.")
+                database.set_state("had_items_recently", "True")
 
     except Exception as e:
-        print(f"Startup Sync Error: {e}")
-
+        print(f"Critical Sync Error: {e}")
 
 async def update_master_message(bot: Bot):
-    """Update the existing master message or send a new one. SIMPLE LOGIC."""
+    """Update the existing master message or send a new one. SIMPLE EDIT-FIRST LOGIC."""
+    # SINCRONIZACIÓN TOTAL EN CADA UPDATE
+    await sync_and_recover(bot)
+    
     text, reply_markup = render_list()
     
     chat_id = os.getenv("CHAT_ID")
@@ -92,22 +125,28 @@ async def update_master_message(bot: Bot):
                 parse_mode="Markdown"
             )
             print(f"Update: Edited message {master_message_id} successfully.")
-            return  # ¡ÉXITO! Salimos.
+            
+            # RE-PIN ASEGURADO: Siempre intentamos fijarlo por si se perdió el pin
+            try:
+                await bot.pin_chat_message(chat_id=chat_id, message_id=int(master_message_id), disable_notification=True)
+            except Exception:
+                 pass
+                 
+            return
         except Exception as e:
             err_str = str(e).lower()
             if "message is not modified" in err_str:
-                print(f"Update: Message {master_message_id} not modified (no change).")
-                return  # Nada que cambiar.
+                print(f"Update: Message {master_message_id} not modified.")
+                return
             
-            # Si el mensaje ya no existe o no se puede editar, procedemos a crear uno nuevo
             if "message to edit not found" in err_str or "message can't be edited" in err_str:
                 print(f"Update: Message {master_message_id} not found. Will create new.")
             else:
-                print(f"Update: Unexpected edit error: {e}. Will try to create new.")
+                print(f"Update: Unexpected edit error: {e}")
 
-    # PASO 2: Crear mensaje nuevo (SOLO si edit falló o no había ID)
+    # PASO 2: Crear mensaje nuevo
     try:
-        # Limpiar estado viejo
+        # Limpiar
         if master_message_id:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
@@ -127,7 +166,6 @@ async def update_master_message(bot: Bot):
         )
         new_id = msg.message_id
         database.set_state("master_message_id", new_id)
-        print(f"Update: Sent new message {new_id}.")
         
         try:
             await bot.pin_chat_message(chat_id=chat_id, message_id=new_id, disable_notification=True)
