@@ -31,7 +31,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_item(name, quantity, category):
+def add_item(name, quantity, category, item_id=None):
     conn = get_connection()
     cursor = conn.cursor()
     
@@ -46,11 +46,17 @@ def add_item(name, quantity, category):
             (quantity, category, item[0])
         )
     else:
-        # Si no existe, insertamos uno nuevo
-        cursor.execute(
-            "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
-            (name, quantity, category)
-        )
+        # Si no existe, insertamos uno nuevo (usando ID si se provee)
+        if item_id:
+            cursor.execute(
+                "INSERT INTO items (id, name, quantity, category) VALUES (?, ?, ?, ?)",
+                (item_id, name, quantity, category)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
+                (name, quantity, category)
+            )
     
     conn.commit()
     conn.close()

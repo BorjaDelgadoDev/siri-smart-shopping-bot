@@ -88,7 +88,10 @@ async def sync_and_recover(bot: Bot):
                     if "(" in name_part and ")" in name_part:
                         quantity = name_part.split("(")[1].split(")")[0]
                     
-                    database.add_item(base_name, quantity, current_category)
+                    # Recuperar el ID del botón si existe para que los botones sigan funcionando
+                    recovered_id = item_button_map.get(base_name)
+                    
+                    database.add_item(base_name, quantity, current_category, item_id=recovered_id)
                     recovered_count += 1
             
             if recovered_count > 0:
