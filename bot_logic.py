@@ -65,6 +65,16 @@ async def sync_and_recover(bot: Bot):
         if not local_items and pinned.text:
             print(f"Sync: DB empty. Attempting recovery from pin {pinned.message_id}...")
             
+            # Mapear botones a IDs para mantener consistencia si es posible
+            item_button_map = {}
+            if pinned.reply_markup:
+                for row in pinned.reply_markup.inline_keyboard:
+                    for button in row:
+                        if button.callback_data.startswith("buy_"):
+                            button_name = button.text.replace("✅ ", "").strip()
+                            button_id = button.callback_data.replace("buy_", "")
+                            item_button_map[button_name] = button_id
+
             lines = pinned.text.split("\n")
             current_category = "13. 📦 Otros"
             recovered_count = 0
