@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def render_list():
-    """Generatete the text and the keyboard for the shopping list."""
+    """Generate the text and the keyboard for the shopping list."""
     items = database.get_all_items()
     
     if not items:
@@ -27,97 +27,49 @@ def render_list():
         for item_id, name, quantity in category_items:
             quantity_str = f" ({quantity})" if quantity != "1" else ""
             text += f"• {name}{quantity_str}\n"
-            # Botón para eliminar (comprado)
             keyboard.append([InlineKeyboardButton(f"✅ {name}", callback_data=f"buy_{item_id}")])
         text += "\n"
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return text, reply_markup
 
-async def ensure_db_synced(bot: Bot):
-    """Ensure the local DB is in sync with Telegram's pinned message. MUST be called first."""
+async def adopt_telegram_pin(bot: Bot):
+    """On startup ONLY: Adopt Telegram's pinned message as master if it's ours."""
     chat_id = os.getenv("CHAT_ID")
     if not chat_id:
         return
         
     try:
-        # 1. Asegurar inicialización
         try:
             await bot.initialize()
         except Exception:
             pass
 
-        # 2. Consultar Telegram
         chat = await bot.get_chat(chat_id)
         pinned = chat.pinned_message
         if not pinned:
+            print("Startup Sync: No pinned message found.")
             return
 
-        # 3. Verificar si el bot es el autor
         bot_me = await bot.get_me()
         if pinned.from_user.id != bot_me.id:
+            print("Startup Sync: Pinned message is not from this bot.")
             return
 
-        # 4. Obtener estado actual
+        # Adoptar el pin de Telegram como master
         current_master_id = database.get_state("master_message_id")
-        local_items = database.get_all_items()
-
-        # 5. FUENTE DE VERDAD: Adoptar el pin de Telegram si es nuestro
-        # Esto previene duplicados si el bot se reinicia pero el pin sigue ahí.
         if str(current_master_id) != str(pinned.message_id):
-            print(f"Sync: Adopting Telegram Pin {pinned.message_id} as master.")
+            print(f"Startup Sync: Adopting Telegram Pin {pinned.message_id} (was {current_master_id}).")
             database.set_state("master_message_id", str(pinned.message_id))
-            current_master_id = str(pinned.message_id)
-
-        # 6. ¡SANACIÓN!: Recuperamos solo si la DB está vacía pero SABÍAMOS que debería haber items
-        # (Esto indica una pérdida accidental de datos en la DB local)
-        should_heal = not local_items and database.get_state("had_items_recently") == "True"
-        
-        if should_heal and pinned.reply_markup and pinned.text:
-            print(f"Self-Healing: DB empty & No Master ID. Recovering from pin {pinned.message_id}...")
-            # ... (resto de la lógica igual)
-            
-            # Mapear botones a nombres e IDs
-            item_button_map = {}
-            for row in pinned.reply_markup.inline_keyboard:
-                for button in row:
-                    if button.callback_data.startswith("buy_"):
-                        button_name = button.text.replace("✅ ", "").strip()
-                        button_id = button.callback_data.replace("buy_", "")
-                        item_button_map[button_name] = button_id
-
-            lines = pinned.text.split("\n")
-            current_category = "📦 Otros"
-            recovered_count = 0
-
-            for line in lines:
-                line = line.strip()
-                if not line or line.startswith("📝") or "Lista de la Compra" in line:
-                    continue
-                
-                if line.startswith("•"):
-                    name_part = line.replace("•", "").strip()
-                    base_name = name_part.split("(")[0].strip()
-                    if base_name in item_button_map:
-                        quantity = "1"
-                        if "(" in name_part and ")" in name_part:
-                            quantity = name_part.split("(")[1].split(")")[0]
-                        database.sync_item(base_name, quantity, current_category)
-                        recovered_count += 1
-                else:
-                    current_category = line
-
-            if recovered_count > 0:
-                print(f"Self-Healing: Recovered {recovered_count} items from pin.")
+        else:
+            print(f"Startup Sync: Master ID {current_master_id} is already in sync.")
 
     except Exception as e:
-        print(f"Sync/Sanity Error: {e}")
+        print(f"Startup Sync Error: {e}")
+
 
 async def update_master_message(bot: Bot):
-    """Update the existing master message or send a new one with robust sync."""
-    # Sincronización obligatoria antes de nada (por si Render reinició)
-    await ensure_db_synced(bot)
-    
+    """Update the existing master message or send a new one. SIMPLE LOGIC."""
     text, reply_markup = render_list()
     
     chat_id = os.getenv("CHAT_ID")
@@ -125,13 +77,11 @@ async def update_master_message(bot: Bot):
         print("Error: CHAT_ID not set in .env")
         return
 
-    # Intentar obtener ID sincronizado
     master_message_id = database.get_state("master_message_id")
-    # Convertir "None" string a None real
     if master_message_id == "None" or master_message_id is None:
         master_message_id = None
 
-    # 3. Si tenemos un ID (recuperado o local), intentamos editar
+    # PASO 1: Intentar editar el mensaje existente
     if master_message_id:
         try:
             await bot.edit_message_text(
@@ -141,28 +91,31 @@ async def update_master_message(bot: Bot):
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
             )
-            return # Éxito total: mensaje actualizado.
+            print(f"Update: Edited message {master_message_id} successfully.")
+            return  # ¡ÉXITO! Salimos.
         except Exception as e:
             err_str = str(e).lower()
             if "message is not modified" in err_str:
-                return # Nada que cambiar, salimos felices.
+                print(f"Update: Message {master_message_id} not modified (no change).")
+                return  # Nada que cambiar.
             
-            # Si el mensaje ha desaparecido o no es editable, procedemos a crear uno nuevo
+            # Si el mensaje ya no existe o no se puede editar, procedemos a crear uno nuevo
             if "message to edit not found" in err_str or "message can't be edited" in err_str:
-                print(f"Master msg {master_message_id} lost/un-editable. Creating new.")
+                print(f"Update: Message {master_message_id} not found. Will create new.")
             else:
-                print(f"Critical Edit Error for {master_message_id}: {e}")
-                # En caso de error crítico, asumimos que el mensaje ya no sirve
+                print(f"Update: Unexpected edit error: {e}. Will try to create new.")
 
-    # 4. Fallback: Crear mensaje nuevo
+    # PASO 2: Crear mensaje nuevo (SOLO si edit falló o no había ID)
     try:
-        # Antes de enviar uno nuevo, intentamos BORRAR el viejo y DESANCLAR TODO
-        # para que no queden múltiples burbujas de "mensaje fijado".
-        try:
-            print("Pin-Cleanup: Cleaning up old pins before sending new master.")
-            await bot.unpin_all_chat_messages(chat_id=chat_id)
-            if master_message_id:
+        # Limpiar estado viejo
+        if master_message_id:
+            try:
                 await bot.delete_message(chat_id=chat_id, message_id=int(master_message_id))
+            except Exception:
+                pass
+        
+        try:
+            await bot.unpin_all_chat_messages(chat_id=chat_id)
         except Exception:
             pass
 
@@ -174,61 +127,13 @@ async def update_master_message(bot: Bot):
         )
         new_id = msg.message_id
         database.set_state("master_message_id", new_id)
+        print(f"Update: Sent new message {new_id}.")
         
-        # Anclado silencioso
         try:
             await bot.pin_chat_message(chat_id=chat_id, message_id=new_id, disable_notification=True)
-            print(f"Pin-Cleanup: New master pinned: {new_id}")
+            print(f"Update: Pinned message {new_id}.")
         except Exception as pin_err: 
-            print(f"Warning pinning message: {pin_err}")
+            print(f"Update: Warning pinning: {pin_err}")
             
     except Exception as e:
-        print(f"Fatal error sending master message: {e}")
-
-async def audit_and_fix(bot: Bot):
-    """Real-time audit of the chat state. Returns a diagnostic report."""
-    chat_id = os.getenv("CHAT_ID")
-    if not chat_id:
-        return {"error": "CHAT_ID not configured"}
-
-    report = {
-        "timestamp": os.popen("date").read().strip(),
-        "local_state": {
-            "master_message_id": database.get_state("master_message_id"),
-            "items_in_db": len(database.get_all_items())
-        },
-        "remote_state": {},
-        "issues": [],
-        "actions_taken": []
-    }
-
-    try:
-        # Sincronización obligatoria antes de auditar
-        await ensure_db_synced(bot)
-
-        chat = await bot.get_chat(chat_id)
-        pinned = chat.pinned_message
-        
-        if pinned:
-            report["remote_state"]["pinned_message_id"] = pinned.message_id
-            bot_me = await bot.get_me()
-            report["remote_state"]["pinned_by_bot"] = (pinned.from_user.id == bot_me.id)
-            report["remote_state"]["pinned_text_snippet"] = pinned.text[:30] + "..." if pinned.text else None
-        else:
-            report["remote_state"]["pinned_message_id"] = None
-            report["issues"].append("No message is pinned in this chat.")
-
-        # Diagnosis
-        db_id = report["local_state"]["master_message_id"]
-        pin_id = report["remote_state"].get("pinned_message_id")
-
-        if pin_id and str(db_id) != str(pin_id):
-            report["issues"].append(f"State mismatch: DB thinks {db_id}, Telegram has {pin_id} pinned.")
-            # Auto-fix: Adopt the pinned one
-            database.set_state("master_message_id", pin_id)
-            report["actions_taken"].append(f"Updated local master_message_id to {pin_id}")
-
-    except Exception as e:
-        report["error"] = str(e)
-
-    return report
+        print(f"Update: Fatal error: {e}")

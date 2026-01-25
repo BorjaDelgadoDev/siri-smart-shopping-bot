@@ -34,6 +34,9 @@ async def startup_event():
         # Requerido en python-telegram-bot v20+
         await bot.initialize()
         print("Bot initialized properly.")
+        
+        # Sincronización única al inicio: Adoptar pin de Telegram si existe
+        await bot_logic.adopt_telegram_pin(bot)
 
     # Automatización del Webhook si existe BASE_URL
     base_url = os.getenv("BASE_URL")
@@ -56,10 +59,6 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     # Validación de seguridad
     if not expected_token or x_auth_token != expected_token:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-    # Sincronización proactiva: Asegurar recuperación si Render reinició
-    if bot:
-        await bot_logic.ensure_db_synced(bot)
 
     # Procesamiento asíncrono
     raw_text = request.text
@@ -112,11 +111,7 @@ async def telegram_webhook(request: Request):
     update = Update.de_json(data, bot)
     chat_id_env = os.getenv("CHAT_ID")
     
-    # 1. Sincronización proactiva antes de gestionar botones
-    if bot:
-        await bot_logic.ensure_db_synced(bot)
-
-    # 2. Procesar CallbackQueries (Botón Comprar)
+    # 1. Procesar CallbackQueries (Botón Comprar)
     if update.callback_query:
         query = update.callback_query
         data_recv = query.data
@@ -156,10 +151,14 @@ async def chat_audit(x_auth_token: str = Header(None)):
     expected_token = os.getenv("SIRI_AUTH_TOKEN")
     if not expected_token or x_auth_token != expected_token:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    report = await bot_logic.audit_and_fix(bot)
-    report["flight_recorder"] = DIAGNOSTIC_DATA
-    return report
+    items = database.get_all_items()
+    master_id = database.get_state("master_message_id")
+    return {
+        "status": "ok",
+        "master_message_id": master_id,
+        "items_count": len(items),
+        "flight_recorder": DIAGNOSTIC_DATA
+    }
 
 @app.get("/debug/status")
 async def debug_status(x_auth_token: str = Header(None)):
