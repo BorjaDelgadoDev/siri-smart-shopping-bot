@@ -49,7 +49,7 @@ def configure_ai():
         return None
     genai.configure(api_key=api_key)
     return genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
+        model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT
     )
 
