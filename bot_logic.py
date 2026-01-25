@@ -108,8 +108,7 @@ async def ensure_db_synced(bot: Bot):
                     current_category = line
 
             if recovered_count > 0:
-                print(f"Self-Healing Cache: Force new message to sync button IDs.")
-                database.set_state("master_message_id", None)
+                print(f"Self-Healing: Recovered {recovered_count} items from pin.")
 
     except Exception as e:
         print(f"Sync/Sanity Error: {e}")
