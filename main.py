@@ -122,11 +122,13 @@ async def telegram_webhook(request: Request):
             database.delete_item(item_id)
             
             # Si la lista se queda vacía tras comprar, marcamos que es INTENCIONADO
-            # para que 'ensure_db_synced' no intente recuperarlos del pin.
+            # para que 'sync_and_recover' NO intente recuperarlos del pin antiguo.
             current_items = database.get_all_items()
             if not current_items:
-                database.set_state("had_items_recently", "") # Empty string = False-ish
-                print("Janitor: List emptied intentionally via button.")
+                database.set_state("is_intentional_empty", "True")
+                print("Janitor: List emptied intentionally via button. Setting flag.")
+            else:
+                database.set_state("is_intentional_empty", "")
             
             # 1. Responder inmediatamente para quitar el "Cargando..."
             await query.answer("¡Comprado!")

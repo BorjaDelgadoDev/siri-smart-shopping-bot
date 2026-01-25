@@ -57,6 +57,9 @@ def add_item(name, quantity, category, item_id=None):
                 "INSERT INTO items (name, quantity, category) VALUES (?, ?, ?)",
                 (name, quantity, category)
             )
+        
+        # Al añadir algo, ya no es un "listado vacío intencionado"
+        cursor.execute("INSERT OR REPLACE INTO bot_state (key, value) VALUES ('is_intentional_empty', '')")
     
     conn.commit()
     conn.close()
