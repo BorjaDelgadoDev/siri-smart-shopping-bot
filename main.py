@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 import ai_handler
 import database
@@ -58,7 +59,7 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     
     # Validación de seguridad
     # Comparación insensible a mayúsculas para evitar errores en Shortcuts
-    if not expected_token or x_auth_token.lower() != expected_token.lower():
+    if not x_auth_token or not expected_token or x_auth_token.lower() != expected_token.lower():
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Procesamiento asíncrono
@@ -67,7 +68,7 @@ async def siri_endpoint(request: SiriRequest, x_auth_token: str = Header(None)):
     
     # Guardar en diagnóstico
     DIAGNOSTIC_DATA["last_siri_text"] = raw_text
-    DIAGNOSTIC_DATA["last_request_time"] = os.popen("date").read().strip()
+    DIAGNOSTIC_DATA["last_request_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         products = ai_handler.process_text(raw_text)
@@ -111,7 +112,17 @@ async def telegram_webhook(request: Request):
     data = await request.json()
     update = Update.de_json(data, bot)
     chat_id_env = os.getenv("CHAT_ID")
-    
+
+    # Seguridad: Solo procesar si el chat coincide con el autorizado
+    current_chat_id = None
+    if update.message:
+        current_chat_id = str(update.message.chat_id)
+    elif update.callback_query and update.callback_query.message:
+        current_chat_id = str(update.callback_query.message.chat_id)
+
+    if chat_id_env and current_chat_id != chat_id_env:
+        print(f"Security: Blocked request from unauthorized chat {current_chat_id}")
+        return {"ok": True}    
     # 1. Procesar CallbackQueries (Botón Comprar)
     if update.callback_query:
         query = update.callback_query
@@ -152,7 +163,7 @@ async def telegram_webhook(request: Request):
 async def chat_audit(x_auth_token: str = Header(None)):
     """Secret endpoint for real-time chat monitoring and fixing."""
     expected_token = os.getenv("SIRI_AUTH_TOKEN")
-    if not expected_token or x_auth_token != expected_token:
+    if not x_auth_token or not expected_token or x_auth_token.lower() != expected_token.lower():
         raise HTTPException(status_code=401, detail="Unauthorized")
     items = database.get_all_items()
     master_id = database.get_state("master_message_id")
@@ -167,7 +178,7 @@ async def chat_audit(x_auth_token: str = Header(None)):
 async def debug_status(x_auth_token: str = Header(None)):
     """Remote monitoring endpoint."""
     expected_token = os.getenv("SIRI_AUTH_TOKEN")
-    if not expected_token or x_auth_token != expected_token:
+    if not x_auth_token or not expected_token or x_auth_token.lower() != expected_token.lower():
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     items = database.get_all_items()
