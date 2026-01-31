@@ -80,6 +80,23 @@ Usaremos **Render**, un "parking" gratuito para aplicaciones:
 
 ---
 
+## 🤝 Contribuciones
+
+Este repositorio sigue un estándar de desarrollo profesional. Para mantener la calidad del código, la rama `main` está protegida y **no se permiten commits directos**.
+
+Si quieres contribuir, sigue estos pasos:
+
+1. **Fork** el proyecto.
+2. Crea una **rama** para tu mejora (`git checkout -b feature/nueva-funcionalidad`).
+3. Realiza tus cambios y haz **commit** (`git commit -m 'feat: añade nueva funcionalidad'`).
+4. Haz **Push** a tu rama (`git push origin feature/nueva-funcionalidad`).
+5. Abre un **Pull Request** hacia la rama `main` de este repositorio.
+
+> [!NOTE]
+> Todos los cambios deben pasar automáticamente el control de sintaxis (**Python Syntax Guard**) antes de poder ser fusionados.
+
+---
+
 <div align="center">
   <sub>Construido con ❤️ para simplificar la vida en el hogar.</sub>
 </div>
